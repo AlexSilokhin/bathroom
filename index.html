@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ванная 378 × 257 — 3D, итерация 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --viewport:#DCE1DF; --panel:#F7F8F6; --ink:#1E2624; --muted:#5B6864; --line:#C6CFCC;
+  --accent:#2E6F73; --accent-ink:#FFFFFF; --chip:#EAEEEC; --label-bg:rgba(247,248,246,.9); --label-ink:#1E2624;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --viewport:#1A201F; --panel:#242B2A; --ink:#E4EBE9; --muted:#9AA8A4; --line:#3A4644;
+    --accent:#7FC2C1; --accent-ink:#0F1918; --chip:#2E3736; --label-bg:rgba(36,43,42,.9); --label-ink:#E4EBE9;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --viewport:#1A201F; --panel:#242B2A; --ink:#E4EBE9; --muted:#9AA8A4; --line:#3A4644;
+  --accent:#7FC2C1; --accent-ink:#0F1918; --chip:#2E3736; --label-bg:rgba(36,43,42,.9); --label-ink:#E4EBE9;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--viewport);color:var(--ink);
+  font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;overflow:hidden}
+#stage{position:relative;width:100%;height:100%}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;
+  font-size:12px;font-weight:500;color:var(--label-ink);background:var(--label-bg);
+  padding:3px 8px;border-radius:6px;border:1px solid var(--line);margin-top:-6px}
+.lbl.dim{background:transparent;border:none;font-weight:600;color:var(--accent);font-size:13px}
+.hide-labels #labels{display:none}
+
+#panel{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);left:14px;width:292px;max-height:calc(100% - 28px);
+  overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px}
+#panel header{display:flex;align-items:flex-start;gap:8px}
+#panel h1{font-size:19px;line-height:1.2;font-weight:600;margin:0;letter-spacing:-.01em}
+#panel .sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+#panel h2{font-size:13px;font-weight:600;margin:16px 0 8px;color:var(--muted)}
+#collapse{margin-left:auto;flex:none}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:13px;color:var(--ink);background:var(--chip);border:1px solid transparent;
+  border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--line)}
+button[aria-pressed="true"],button[aria-checked="true"]{background:var(--accent);color:var(--accent-ink)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pal button{display:flex;align-items:center;gap:8px;width:100%;text-align:left}
+.sw{display:inline-flex;flex:none;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.sw i{display:block;width:12px;height:18px}
+.pal{display:grid;gap:6px}
+label.tg{display:flex;align-items:center;gap:8px;font-size:14px;padding:3px 0;cursor:pointer}
+label.tg input{width:16px;height:16px;accent-color:var(--accent)}
+.hint{margin:14px 0 0;font-size:12px;color:var(--muted)}
+.collapsed #panel .body{display:none}
+#err{position:absolute;inset:auto 14px 14px 14px;background:#8a2b2b;color:#fff;padding:10px 14px;border-radius:10px;font-size:14px}
+@media (max-width:640px){
+  #panel{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);left:10px;right:10px;width:auto;max-height:52%}
+  .views{flex-wrap:nowrap;overflow-x:auto}
+  .views button{flex:none}
+}
+</style>
+</head>
+<body>
+<div id="stage"><div id="labels" aria-hidden="true"></div></div>
+
+<aside id="panel" aria-label="Настройки модели">
+  <header>
+    <div>
+      <h1>Ванная комната</h1>
+      <p class="sub">378 × 257 см, потолок 290. Итерация 2: тумба 120, шкаф, LED-лента.</p>
+    </div>
+    <button id="collapse" aria-expanded="true">Свернуть</button>
+  </header>
+  <div class="body">
+    <h2>Камера</h2>
+    <div class="btns views" role="group" aria-label="Готовые ракурсы">
+      <button data-view="over" aria-pressed="true">Обзор</button>
+      <button data-view="back" aria-pressed="false">С другой стороны</button>
+      <button data-view="plan" aria-pressed="false">План</button>
+      <button data-view="door" aria-pressed="false">От двери</button>
+      <button data-view="vanity" aria-pressed="false">От раковин</button>
+    </div>
+
+    <h2>Отделка</h2>
+    <div class="pal" role="radiogroup" aria-label="Палитра отделки" id="pal"></div>
+
+    <h2>Показать</h2>
+    <label class="tg"><input type="checkbox" id="tgLabels" checked> Подписи и размеры</label>
+    <label class="tg"><input type="checkbox" id="tgCurtain" checked> Шторка в душе</label>
+    <label class="tg"><input type="checkbox" id="tgLed" checked> LED-лента у потолка</label>
+    <label class="tg"><input type="checkbox" id="tgDoor"> Дверь открыта</label>
+
+    <p class="hint">Мышь: левая кнопка вращает, правая сдвигает, колесо приближает. На телефоне: один палец вращает, двумя пальцами масштаб и сдвиг. Стены, которые закрывают обзор, прячутся сами.</p>
+  </div>
+</aside>
+<div id="err" hidden></div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/RoomEnvironment.js"></script>
+<script src="lib/Reflector.js"></script>
+<script>
+(function(){
+'use strict';
+const errBox = document.getElementById('err');
+function showErr(msg){ errBox.hidden = false; errBox.textContent = msg; }
+window.addEventListener('error', e => showErr('Ошибка в модели: ' + (e.message || e)));
+if (!window.THREE) { showErr('Не удалось загрузить библиотеку three.js. Проверьте интернет и обновите страницу.'); return; }
+if (THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
+
+/* ---------- Все размеры в сантиметрах ---------- */
+const C = {
+  W: 378, D: 257, H: 290,              // комната: x вдоль 378, z вдоль 257, высота
+  tOut: 38, tIn: 12,                    // наружная стена (слева) и перегородки
+  win:  { u0: 115, w: 51, sill: 90, h: 125, proj: 4, reveal: 25 },    // окно в левой стене, подоконник выступает на 4 см
+  door: { z0: 82, w: 78, h: 210, leaf: 70 },                           // дверь в правой стене
+  box:  { x1: 160, d: 20, h: 120 },     // короб инсталляции
+  wc:   50, bidet: 110,                 // оси унитаза и биде от левой стены
+  van:  { x0: 160, w: 120, d: 48, bottom: 45, top: 85 },
+  cab:  { x0: 329.5, d: 48, bottom: 15, top: 225 },        // подвесной шкаф в углу у двери
+  mir:  { cx: 220, w: 110, h: 80, bottom: 110 },
+  tub:  { x0: 198, z0: 167, L: 180, B: 90, rim: 58 },
+  sh:   { x1: 130, z0: 157 },           // душ: x 0..130, z 157..257
+  dry:  { x0: 140, w: 50, h: 80, bottom: 90 }
+};
+const PI = Math.PI, V3 = THREE.Vector3;
+let vw = 0, vh = 0;
+
+const PALETTES = {
+  stone:    { name:'Светлый камень', wall:'#E6E2DA', wallVein:'#B7AEA2', grout:'#D3CDC3', floor:'#C8C1B5', floorVein:'#988E81', floorGrout:'#B2AA9E', wood:'#A27A52', top:'#EEEAE3', metal:'chrome' },
+  concrete: { name:'Тёплый бетон',   wall:'#C9C3B9', wallVein:'#A29B90', grout:'#B6B0A6', floor:'#8C867F', floorVein:'#6C6760', floorGrout:'#78726B', wood:'#C6A47B', top:'#B8B2A9', metal:'black' },
+  galala:   { name:'Мрамор Galala', wall:'#E4D7C1', wallVein:'#BFA683', grout:'#DDD0BA', floor:'#DCCDB3', floorVein:'#B2976F', floorGrout:'#CDBFA6', wood:'#DCC8AC', top:'#EADFCC', metal:'chrome', marble:true, rough:.18, lacquer:true }
+};
+const METALS = {
+  chrome: { color:'#D9DBDD', metalness:1, roughness:.12 },
+  black:  { color:'#2A2A2A', metalness:.35, roughness:.5 },
+  brass:  { color:'#C29C5E', metalness:1, roughness:.3 }
+};
+
+/* ---------- Рендерер ---------- */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = .82;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.insertBefore(renderer.domElement, stage.firstChild);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 1, 6000);
+
+if (THREE.RoomEnvironment) {
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+}
+
+/* ---------- Текстуры ---------- */
+function rng(seed){ let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = s * 16807 % 2147483647) / 2147483647; }
+function tileTexture(tw, th, base, vein, grout, seed, marble){
+  const k = 8, cw = Math.round(tw*k), ch = Math.round(th*k);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const g = c.getContext('2d'), r = rng(seed);
+  g.fillStyle = base; g.fillRect(0,0,cw,ch);
+  for (let i=0;i<700;i++){ g.globalAlpha = .035*r(); g.fillStyle = r()>.5 ? vein : '#FFFFFF';
+    g.beginPath(); g.arc(r()*cw, r()*ch, 6+r()*46, 0, 2*PI); g.fill(); }
+  g.strokeStyle = vein;
+  for (let j=0;j<4;j++){ g.globalAlpha = .12 + r()*.12; g.lineWidth = .6 + r()*1.4; g.beginPath();
+    let x = r()*cw, y = 0; g.moveTo(x,y);
+    while (y < ch){ x += (r()-.5)*46; y += 18 + r()*30; g.lineTo(x,y); } g.stroke(); }
+  if (marble){
+    // Galala: мягкие размытые прожилки и мелкие вкрапления-окаменелости
+    g.filter = 'blur(2px)'; g.strokeStyle = vein;
+    for (let j=0;j<6;j++){ g.globalAlpha = .08 + r()*.1; g.lineWidth = 3 + r()*6; g.beginPath();
+      let x = r()*cw, y = r()*ch*.3; g.moveTo(x,y);
+      while (y < ch){ x += (r()-.35)*60; y += 30 + r()*50; g.lineTo(x,y); } g.stroke(); }
+    g.filter = 'none';
+    for (let i=0;i<420;i++){ g.globalAlpha = .12 + r()*.3; g.fillStyle = r() > .3 ? vein : '#FFF8EC';
+      g.beginPath(); g.ellipse(r()*cw, r()*ch, .6 + r()*2.6, .6 + r()*1.6, r()*PI, 0, 2*PI); g.fill(); }
+  }
+  g.globalAlpha = 1; g.strokeStyle = grout; g.lineWidth = 4; g.strokeRect(0,0,cw,ch);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1/tw, 1/th);
+  t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+function woodTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d'), r = rng(7);
+  g.fillStyle = '#FFFFFF'; g.fillRect(0,0,512,512);
+  for (let i=0;i<150;i++){ const y = r()*512, a = r()*3;
+    g.strokeStyle = 'rgba(80,55,30,' + (0.03 + r()*0.09).toFixed(3) + ')'; g.lineWidth = .5 + r()*2.4;
+    g.beginPath(); g.moveTo(0,y); for (let x=0;x<=512;x+=32) g.lineTo(x, y + Math.sin(x/80 + i)*a); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+}
+function glowTexture(){
+  const c = document.createElement('canvas'); c.width = 400; c.height = 240;
+  const g = c.getContext('2d');
+  g.shadowColor = 'rgba(255,232,196,1)'; g.shadowBlur = 34; g.fillStyle = 'rgba(255,232,196,1)';
+  g.fillRect(40, 40, 320, 160);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+}
+
+/* ---------- Материалы ---------- */
+const std = o => new THREE.MeshStandardMaterial(o);
+const M = {
+  wallTile:  std({ color:'#FFFFFF', roughness:.45 }),
+  floorTile: std({ color:'#FFFFFF', roughness:.45 }),
+  plaster:   std({ color:'#D7D3CB', roughness:.95 }),
+  dark:      std({ color:'#5A5856', roughness:.9 }),
+  ceramic:   std({ color:'#F7F7F5', roughness:.12 }),
+  ceramicDS: std({ color:'#F7F7F5', roughness:.12, side:THREE.DoubleSide }),
+  tubIn:     std({ color:'#F4F4F2', roughness:.18, side:THREE.BackSide }),
+  bowlIn:    std({ color:'#D9DCDD', roughness:.2 }),
+  metal:     std({ color:'#D9DBDD', metalness:1, roughness:.12 }),
+  wood:      std({ color:'#A27A52', roughness:.62, map: woodTexture() }),
+  woodDark:  std({ color:'#715538', roughness:.7 }),
+  top:       std({ color:'#EEEAE3', roughness:.28 }),
+  pvc:       std({ color:'#F4F4F2', roughness:.4 }),
+  leaf:      std({ color:'#EDEBE6', roughness:.5 }),
+  ceiling:   std({ color:'#F6F6F4', roughness:1 }),
+  glass:     new THREE.MeshPhysicalMaterial({ color:'#E8F0F0', roughness:.4, metalness:0, transparent:true, opacity:.42, depthWrite:false, side:THREE.DoubleSide }),
+  winGlass:  new THREE.MeshPhysicalMaterial({ color:'#CFE2EA', roughness:.05, metalness:0, transparent:true, opacity:.2, depthWrite:false, side:THREE.DoubleSide }),
+  curtain:   std({ color:'#F3F1EC', roughness:.9, transparent:true, opacity:.62, side:THREE.DoubleSide, depthWrite:false }),
+  led:       new THREE.MeshBasicMaterial({ color:'#FFF1DA' }),
+  glow:      new THREE.MeshBasicMaterial({ map: glowTexture(), transparent:true, depthWrite:false })
+};
+Object.values(M).forEach(m => { if (m.isMeshStandardMaterial && m !== M.metal) m.envMapIntensity = .5; });
+function replaceMap(mat, tex){ if (mat.map) mat.map.dispose(); mat.map = tex; mat.needsUpdate = true; }
+function applyPalette(key){
+  const p = PALETTES[key];
+  replaceMap(M.wallTile,  tileTexture(60, 120, p.wall,  p.wallVein,  p.grout, 11, p.marble));
+  replaceMap(M.floorTile, tileTexture(120, 60, p.floor, p.floorVein, p.floorGrout, 23, p.marble));
+  M.wallTile.roughness = p.rough || .45; M.floorTile.roughness = p.rough ? p.rough + .1 : .45;
+  M.wood.color.set(p.wood);
+  if (!applyPalette.woodTex) applyPalette.woodTex = M.wood.map;
+  M.wood.map = p.lacquer ? null : applyPalette.woodTex;          // глянец без текстуры дерева
+  M.wood.roughness = p.lacquer ? .1 : .62; M.wood.needsUpdate = true;
+  M.woodDark.color.set(p.wood).multiplyScalar(.62);
+  M.top.color.set(p.top);
+  const m = METALS[p.metal];
+  M.metal.color.set(m.color); M.metal.metalness = m.metalness; M.metal.roughness = m.roughness;
+}
+
+/* ---------- Геометрические помощники ---------- */
+function poly(pts, holes){
+  const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]);
+  for (let i=1;i<pts.length;i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath();
+  (holes||[]).forEach(h => { const p = new THREE.Path(); p.moveTo(h[0][0], h[0][1]);
+    for (let i=1;i<h.length;i++) p.lineTo(h[i][0], h[i][1]); p.closePath(); s.holes.push(p); });
+  return s;
+}
+const rect = (x,y,w,h) => [[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+function roundRect(x,y,w,h,r){
+  const s = new THREE.Shape();
+  s.moveTo(x+r,y); s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r);
+  s.lineTo(x+w,y+h-r); s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y); return s;
+}
+// Ставит объект на плоскость стены: локальный x идёт вдоль стены (u), y вверх, +z в комнату.
+function place(o, wall, off){
+  switch (wall){
+    case 'N': o.position.set(0, 0, off);            o.rotation.set(0, 0, 0); break;      // u = x
+    case 'S': o.position.set(C.W, 0, C.D - off);    o.rotation.set(0, PI, 0); break;     // u = W - x
+    case 'W': o.position.set(off, 0, C.D);          o.rotation.set(0, PI/2, 0); break;   // u = D - z
+    case 'E': o.position.set(C.W - off, 0, 0);      o.rotation.set(0, -PI/2, 0); break;  // u = z
+  }
+  return o;
+}
+function onWall(parent, wall, u, v, child){
+  const g = new THREE.Group(); place(g, wall, 0);
+  child.position.set(u, v, child.position.z); g.add(child); parent.add(g); return g;
+}
+function box(x0,x1,y0,y1,z0,z1,mat){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x1-x0, y1-y0, z1-z0), mat);
+  m.position.set((x0+x1)/2, (y0+y1)/2, (z0+z1)/2); return m;
+}
+function cyl(r, len, mat, axis, seg){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg || 20), mat);
+  if (axis === 'x') m.rotation.z = PI/2; if (axis === 'z') m.rotation.x = PI/2; return m;
+}
+function tiled(shape, mat, wall, off){
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), mat); m.receiveShadow = true; return place(m, wall, off);
+}
+
+/* ---------- Стены ---------- */
+const walls = {};
+function makeWall(id, faceShape, masShape, thick, normal, point){
+  const g = new THREE.Group();
+  g.add(tiled(faceShape, M.wallTile, id, .15));
+  const mas = new THREE.Mesh(new THREE.ExtrudeGeometry(masShape, { depth: thick, bevelEnabled:false }), M.plaster);
+  place(mas, id, -thick); g.add(mas);
+  scene.add(g); walls[id] = { g, n: normal, p: point }; return g;
+}
+const winHole   = rect(C.win.u0, C.win.sill, C.win.w, C.win.h);  // u = D - z
+const nicheHole = rect(25, 105, 50, 30);
+makeWall('W', poly(rect(0,0,C.D,C.H), [winHole, nicheHole]),
+              poly(rect(-C.tIn,0,C.D+2*C.tIn,C.H), [winHole, nicheHole]), C.tOut, new V3(1,0,0), new V3(0,0,0));
+const dz0 = C.door.z0, dz1 = C.door.z0 + C.door.w;
+makeWall('E', poly([[0,0],[dz0,0],[dz0,C.door.h],[dz1,C.door.h],[dz1,0],[C.D,0],[C.D,C.H],[0,C.H]]),
+              poly([[-C.tIn,0],[dz0,0],[dz0,C.door.h],[dz1,C.door.h],[dz1,0],[C.D+C.tIn,0],[C.D+C.tIn,C.H],[-C.tIn,C.H]]),
+              C.tIn, new V3(-1,0,0), new V3(C.W,0,0));
+makeWall('N', poly(rect(0,0,C.W,C.H)), poly(rect(0,0,C.W,C.H)), C.tIn, new V3(0,0,1), new V3(0,0,0));
+makeWall('S', poly(rect(0,0,C.W,C.H)), poly(rect(0,0,C.W,C.H)), C.tIn, new V3(0,0,-1), new V3(0,0,C.D));
+
+// Пол
+const floor = new THREE.Mesh(new THREE.ShapeGeometry(poly(rect(0,0,C.W,C.D))), M.floorTile);
+floor.rotation.x = -PI/2; floor.position.set(0, 0, C.D); floor.receiveShadow = true; scene.add(floor);
+
+// Потолок, светильники, датчик движения
+const ceil = new THREE.Group(); scene.add(ceil);
+const cplane = new THREE.Mesh(new THREE.PlaneGeometry(C.W, C.D), M.ceiling);
+cplane.rotation.x = PI/2; cplane.position.set(C.W/2, C.H, C.D/2); ceil.add(cplane);
+const SPOTS = [[65,207],[288,212],[190,62],[250,62],[80,85],[175,120]];
+SPOTS.forEach(([x,z]) => {
+  const d = new THREE.Mesh(new THREE.CircleGeometry(4, 24), M.led);
+  d.rotation.x = PI/2; d.position.set(x, C.H - .1, z); ceil.add(d);
+  const l = new THREE.PointLight(0xFFF0DA, .16, 520, 1); l.position.set(x, C.H - 12, z); scene.add(l);
+});
+const sensor = new THREE.Mesh(new THREE.SphereGeometry(4, 20, 10, 0, 2*PI, 0, PI/2), M.pvc);
+sensor.rotation.x = PI; sensor.position.set(10, C.H, 10); ceil.add(sensor);
+
+// LED-лента в углу потолка вдоль стены с ванной и душем
+const ledGrp = new THREE.Group(); walls.S.g.add(ledGrp);
+const ledLights = new THREE.Group(); scene.add(ledLights);
+(function(){
+  ledGrp.add(box(0, C.W, C.H - 2, C.H, C.D - 4, C.D - .2, M.metal));
+  ledGrp.add(box(.5, C.W - .5, C.H - 2.15, C.H - 2, C.D - 3.5, C.D - .7, M.led));
+  const c = document.createElement('canvas'); c.width = 8; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, 'rgba(255,224,176,.85)'); gr.addColorStop(.35, 'rgba(255,224,176,.3)'); gr.addColorStop(1, 'rgba(255,224,176,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 8, 256);
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+  const wash = new THREE.Mesh(new THREE.PlaneGeometry(C.W, 90), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  wash.position.z = .4; onWall(ledGrp, 'S', C.W/2, C.H - 47, wash);
+  [60, 189, 318].forEach(x => { const l = new THREE.PointLight(0xFFE2B4, .12, 320, 1); l.position.set(x, C.H - 10, C.D - 12); ledLights.add(l); });
+})();
+
+/* ---------- Окно ---------- */
+(function(){
+  const g = walls.W.g, z0 = C.D - C.win.u0 - C.win.w, z1 = C.D - C.win.u0, y0 = C.win.sill, y1 = C.win.sill + C.win.h;
+  const xf1 = -C.win.reveal, xf0 = xf1 - 7, p = 6;
+  g.add(box(xf0,xf1, y0,y1, z0,z0+p, M.pvc), box(xf0,xf1, y0,y1, z1-p,z1, M.pvc),
+        box(xf0,xf1, y0,y0+p, z0,z1, M.pvc), box(xf0,xf1, y1-p,y1, z0,z1, M.pvc),
+        box(xf0+3,xf0+4, y0+p,y1-p, z0+p,z1-p, M.winGlass));
+  g.add(box(xf1, C.win.proj, y0, y0 + 2, z0 - 3, z1 + 3, M.top));      // подоконник, выступ 4 см
+})();
+
+/* ---------- Ниша в душе (в наружной стене) ---------- */
+(function(){
+  const g = walls.W.g, z0 = C.D - 75, z1 = C.D - 25;
+  g.add(box(-10.2,-10, 105,135, z0,z1, M.wallTile));
+  g.add(box(-10,.6, 104.4,105.4, z0,z1, M.top));
+  g.add(box(-9,-1, 133.6,134.2, z0+1,z1-1, M.led));
+})();
+
+/* ---------- Дверь ---------- */
+const doorPivot = new THREE.Group();
+(function(){
+  const g = walls.E.g, X = C.W;
+  g.add(box(X, X+C.tIn, 0, C.door.h - 3, dz0, dz0+4, M.pvc), box(X, X+C.tIn, 0, C.door.h - 3, dz1-4, dz1, M.pvc),
+        box(X, X+C.tIn, C.door.h-7, C.door.h, dz0, dz1, M.pvc));
+  g.add(box(X-1.8, X-.15, 0, C.door.h+7, dz0-7, dz0, M.pvc), box(X-1.8, X-.15, 0, C.door.h+7, dz1, dz1+7, M.pvc),
+        box(X-1.8, X-.15, C.door.h, C.door.h+7, dz0-7, dz1+7, M.pvc));
+  doorPivot.position.set(X + C.tIn, 0, dz0 + 4); g.add(doorPivot);
+  const leaf = box(-4, 0, 0, 203, 0, C.door.leaf, M.leaf); doorPivot.add(leaf);
+  [-1, 1].forEach(s => {
+    const lx = s < 0 ? -5.2 : 1.2;
+    doorPivot.add(box(lx, lx+1.6, 99, 101, C.door.leaf-17, C.door.leaf-5, M.metal));
+    const ros = cyl(2.6, 1, M.metal, 'x'); ros.position.set(s < 0 ? -4.4 : .4, 100, C.door.leaf-6); doorPivot.add(ros);
+  });
+})();
+
+/* ---------- Сантехника и мебель ---------- */
+const fx = new THREE.Group(); scene.add(fx);
+
+// Короб инсталляции 160 × 20 × 120
+fx.add(box(0, C.box.x1 - .2, 0, C.box.h - .2, 0, C.box.d - .2, M.plaster));
+fx.add(tiled(poly(rect(0,0,C.box.x1,C.box.h)), M.wallTile, 'N', C.box.d));
+fx.add(tiled(poly(rect(C.D - C.box.d, 0, C.box.d, C.box.h)), M.wallTile, 'W', C.box.x1));
+fx.add(box(0, C.box.x1, C.box.h, C.box.h + 3, 0, C.box.d + 2, M.top));
+fx.add(box(C.wc - 11, C.wc + 11, 95, 109, C.box.d, C.box.d + .8, M.metal));    // клавиша смыва
+
+function panShape(hw, len){
+  const s = new THREE.Shape(), st = len * .45;
+  s.moveTo(-hw, 0); s.lineTo(hw, 0); s.lineTo(hw, st); s.absellipse(0, st, hw, len - st, 0, PI, false); s.lineTo(-hw, 0);
+  return s;
+}
+function extrudeDown(shape, depth, bevel, mat, bottomY){
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: 36 });
+  const m = new THREE.Mesh(geo, mat); m.rotation.x = PI/2; m.position.y = bottomY + depth + bevel; return m;
+}
+function pan(axis, lid){
+  const g = new THREE.Group(); g.position.set(axis, 0, C.box.d);
+  g.add(extrudeDown(panShape(16.5, 52), 19, 2.5, M.ceramic, 15));          // корпус, верх на 39
+  if (lid){
+    const seat = panShape(16.5, 51.5); const hole = new THREE.Path(); hole.absellipse(0, 30, 11.5, 15, 0, 2*PI, true); seat.holes.push(hole);
+    g.add(extrudeDown(seat, 1.2, .5, M.ceramic, 39.2));
+    g.add(extrudeDown(panShape(16.5, 52), 1.6, .6, M.ceramic, 41.6));
+  } else {
+    const inner = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape().absellipse(0, -31, 11, 15, 0, 2*PI, false), 32), M.bowlIn);
+    inner.rotation.x = -PI/2; inner.position.y = 39.05; g.add(inner);
+    const b = cyl(1.4, 9, M.metal); b.position.set(0, 43.5, 6.5); g.add(b);
+    const sp = cyl(.8, 8, M.metal, 'z'); sp.position.set(0, 47.2, 10); g.add(sp);
+  }
+  fx.add(g);
+}
+pan(C.wc, true);
+pan(C.bidet, false);
+
+// Тумба 120 подвесная с цельной двойной раковиной (литой блок 12 см, верх на 85)
+(function(){
+  const v = C.van, x1 = v.x0 + v.w, bt = 12, y0 = v.top - bt, dep = v.d + 1.5;
+  fx.add(box(v.x0 + .5, x1 - .5, v.bottom + 1, y0, 0, v.d - 2, M.woodDark));
+  const half = v.w / 2;
+  fx.add(box(v.x0, v.x0 + half - .4, v.bottom, y0 - .5, v.d - 2, v.d, M.wood));
+  fx.add(box(v.x0 + half + .4, x1, v.bottom, y0 - .5, v.d - 2, v.d, M.wood));
+  const bw = 46, bd = 32, bz = 12, cxs = [v.x0 + 30, x1 - 30];
+  const slab = poly(rect(0, 0, v.w, dep));
+  cxs.forEach(cx => slab.holes.push(roundRect(cx - v.x0 - bw/2, bz, bw, bd, 9)));
+  fx.add(extrudeDown(slab, bt - 1, .5, M.ceramic, y0).translateX(v.x0));
+  cxs.forEach(cx => {
+    const fl = new THREE.Mesh(new THREE.ShapeGeometry(roundRect(-bw/2, -bz - bd, bw, bd, 9), 16), M.ceramic);
+    fl.rotation.x = -PI/2; fl.position.set(cx, y0 + .6, 0); fx.add(fl);
+    const dr = new THREE.Mesh(new THREE.CircleGeometry(2, 20), M.metal); dr.rotation.x = -PI/2; dr.position.set(cx, y0 + .7, bz + bd/2); fx.add(dr);
+    const body = cyl(1.7, 14, M.metal); body.position.set(cx, v.top + 7, 5.5); fx.add(body);
+    const sp = cyl(1, 12, M.metal, 'z'); sp.position.set(cx, v.top + 12.5, 11); fx.add(sp);
+    fx.add(box(cx - .8, cx + .8, v.top + 12, v.top + 18, 3, 5, M.metal));
+  });
+})();
+
+// Шкаф в углу у двери: подвесной, 48 см, одна глухая дверца
+(function(){
+  const c = C.cab, x1 = C.W - .3;
+  fx.add(box(c.x0 + .5, x1 - .5, c.bottom + .5, c.top - .5, 0, c.d - 2, M.woodDark));
+  fx.add(box(c.x0, x1, c.bottom, c.top, c.d - 2, c.d, M.wood));
+})();
+
+// Зеркало над тумбой, с подсветкой
+(function(){
+  const m = C.mir, cy = m.bottom + m.h/2;
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(m.w * 1.25, m.h * 1.5), M.glow); glow.position.z = .4;
+  const NG = walls.N.g;
+  onWall(NG, 'N', m.cx, cy, glow);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(m.w - 4, m.h - 4, 2), M.dark); back.position.z = 1.3;
+  onWall(NG, 'N', m.cx, cy, back);
+  let mirror;
+  if (THREE.Reflector){
+    mirror = new THREE.Reflector(new THREE.PlaneGeometry(m.w, m.h), { clipBias:.003, textureWidth:1024, textureHeight:512, color:0xC4C8C8 });
+  } else {
+    mirror = new THREE.Mesh(new THREE.PlaneGeometry(m.w, m.h), std({ color:'#D0D6D8', metalness:1, roughness:.04 }));
+  }
+  mirror.position.z = 2.5; onWall(NG, 'N', m.cx, cy, mirror);
+  if (THREE.Reflector){
+    const orig = mirror.onBeforeRender, ids = ['N','S','E','W'];
+    mirror.onBeforeRender = function(r, s, cam){
+      const vis = ids.map(id => walls[id].g.visible), cv = ceil.visible;
+      ids.forEach(id => { walls[id].g.visible = true; }); ceil.visible = true;
+      orig.call(this, r, s, cam);
+      ids.forEach((id, i) => { walls[id].g.visible = vis[i]; }); ceil.visible = cv;
+    };
+  }
+})();
+
+// Полотенцесушитель 50 × 80 на стене со спальней
+(function(){
+  const d = C.dry, g = new THREE.Group();
+  [0, d.w].forEach(x => { const c = cyl(1.6, d.h, M.metal); c.position.set(x, d.h/2, 6); g.add(c);
+    [6, d.h - 6].forEach(y => g.add(box(x - .8, x + .8, y - .8, y + .8, 0, 6, M.metal))); });
+  for (let y = 6; y <= d.h - 4; y += 9.5){ const b = cyl(1.1, d.w, M.metal, 'x'); b.position.set(d.w/2, y, 6); g.add(b); }
+  onWall(fx, 'S', C.W - d.x0 - d.w, d.bottom, g);
+})();
+
+// Радиатор KOER 22 × 500 × 500B под окном: тип 22 (две панели), нижнее подключение справа, термоголовка Oventrop
+(function(){
+  function stripes(n, a, b){
+    const c = document.createElement('canvas'); c.width = 32; c.height = 4; const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 32, 0); gr.addColorStop(0, a); gr.addColorStop(.5, b); gr.addColorStop(1, a);
+    g.fillStyle = gr; g.fillRect(0, 0, 32, 4);
+    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(n, 1); t.encoding = THREE.sRGBEncoding; return t;
+  }
+  const white = std({ color:'#F2F2EE', roughness:.35, envMapIntensity:.5 });
+  const front = std({ color:'#FFFFFF', roughness:.35, envMapIntensity:.5, map: stripes(15, '#D9D9D4', '#F4F4F0') });
+  const grille = std({ color:'#FFFFFF', roughness:.5, envMapIntensity:.4, map: stripes(48, '#F2F2EE', '#5C5C58') });
+  const R = { w: 50, h: 50, gap: 4, dep: 10, bottom: 15 };
+  const u0 = C.win.u0 + (C.win.w - R.w) / 2, z0 = R.gap, z1 = R.gap + R.dep, g = new THREE.Group();
+  g.add(box(0, R.w, 0, R.h - .6, z0, z0 + 1.5, white));
+  g.add(box(0, R.w, 0, R.h - .6, z1 - 1.5, z1, front));
+  g.add(box(-.15, .15, 0, R.h, z0, z1, white), box(R.w - .15, R.w + .15, 0, R.h, z0, z1, white));
+  g.add(box(0, R.w, R.h - .6, R.h, z0, z1, grille));
+  // нижнее подключение: трубы выходят из стены горизонтально и поворачивают на 90° вверх через угловой Н-узел
+  const xr = R.w - 3.5, zc = z0 + R.dep/2, yb = -6.5;
+  [xr, xr - 5].forEach(x => {
+    const up = cyl(.8, -yb, M.metal); up.position.set(x, yb/2, zc); g.add(up);
+    const out = cyl(.8, zc, M.metal, 'z'); out.position.set(x, yb, zc/2); g.add(out);
+    const ros = cyl(2, .6, M.metal, 'z'); ros.position.set(x, yb, .3); g.add(ros);
+  });
+  g.add(box(xr - 7, xr + 2, yb - 1.8, yb + 1.8, zc - 2, zc + 2, M.metal));
+  // термоголовка сбоку: ось вдоль радиатора, из торца со стороны унитаза
+  const v = cyl(1.1, 2.5, M.metal, 'x'); v.position.set(R.w + 1.25, R.h - 6, z1 - 3); g.add(v);
+  const head = cyl(2.8, 7.5, white, 'x', 28); head.position.set(R.w + 6.25, R.h - 6, z1 - 3); g.add(head);
+  onWall(fx, 'W', u0, R.bottom, g);
+})();
+
+// Ванна 180 × 90, встроенная, экран в плитке с нишей для ступней
+(function(){
+  const t = C.tub, x1 = t.x0 + t.L, toe = 6, toeH = 10;
+  const deckShape = poly(rect(0,0,t.L,t.B)); deckShape.holes.push(roundRect(9,9,t.L-18,t.B-18,18));
+  fx.add(extrudeDown(deckShape, 2.4, .3, M.ceramic, t.rim - 3).translateX(t.x0).translateY(t.z0));
+  const basin = new THREE.Mesh(new THREE.ExtrudeGeometry(roundRect(9.2,9.2,t.L-18.4,t.B-18.4,17.8), { depth:42, bevelEnabled:false, curveSegments:24 }), M.tubIn);
+  basin.rotation.x = PI/2; basin.position.set(t.x0, t.rim - 2.6, t.z0); fx.add(basin);
+  // экран смотрит к умывальникам (на север), поэтому раскладка 'S': u = W - x
+  fx.add(tiled(poly(rect(C.W - x1, toeH, t.L, t.rim - 3 - toeH)), M.wallTile, 'S', C.D - t.z0));
+  fx.add(tiled(poly(rect(C.W - x1, 0, t.L, toeH)), M.wallTile, 'S', C.D - t.z0 - toe));
+  const rc = new THREE.Mesh(new THREE.PlaneGeometry(t.L, toe), M.dark); rc.rotation.x = PI/2; rc.position.set(t.x0 + t.L/2, toeH, t.z0 + toe/2); fx.add(rc);
+  fx.add(tiled(poly([[t.z0+toe,0],[C.D,0],[C.D,t.rim-3],[t.z0,t.rim-3],[t.z0,toeH],[t.z0+toe,toeH]]), M.wallTile, 'E', C.W - t.x0));
+  const mix = new THREE.Group();
+  mix.add(box(-7, 7, -2.5, 2.5, 0, 5, M.metal));
+  const sp = cyl(1.2, 15, M.metal, 'z'); sp.position.set(0, -1, 12); mix.add(sp);
+  mix.add(box(4, 5.5, 2.5, 8, 1.5, 3.5, M.metal));
+  onWall(fx, 'S', C.W - (x1 - 90), 72, mix);
+})();
+
+// Душ: трап, стекло, шторка, тропический душ, ниша
+const curtain = new THREE.Group(); scene.add(curtain);
+(function(){
+  const s = C.sh;
+  fx.add(box(20, 110, 0, .35, C.D - 9, C.D - 3, M.metal));
+  fx.add(box(21, 109, .35, .45, C.D - 8, C.D - 4, M.dark));
+  fx.add(box(s.x1 - .4, s.x1 + .4, 0, 200, s.z0, C.D - 1, M.glass));
+  fx.add(box(s.x1 - 1, s.x1 + 1, 0, 200, C.D - 1.5, C.D, M.metal));
+  const stab = cyl(.9, s.x1, M.metal, 'x'); stab.position.set(s.x1/2, 199, C.D - 22); fx.add(stab);
+  const rod = cyl(1, s.x1, M.metal, 'x'); rod.position.set(s.x1/2, 206, s.z0 + 1.5); curtain.add(rod);
+  const cg = new THREE.PlaneGeometry(s.x1 - 4, 188, 120, 1), pos = cg.attributes.position;
+  for (let i=0;i<pos.count;i++) pos.setZ(i, 3 * Math.sin(pos.getX(i) / 14 * 2 * PI));
+  cg.computeVertexNormals();
+  const cm = new THREE.Mesh(cg, M.curtain); cm.position.set(s.x1/2, 16 + 94, s.z0 + 2.5); curtain.add(cm);
+  const rain = new THREE.Group();
+  const arm = cyl(1, 36, M.metal, 'z'); arm.position.set(0, 222, 18); rain.add(arm);
+  rain.add(box(-15, 15, 220, 221.2, 21, 51, M.metal));
+  onWall(fx, 'S', C.W - 65, 0, rain);
+  const th = new THREE.Group();
+  th.add(box(-7, 7, -9, 9, 0, 1.2, M.metal));
+  [-4.5, 4.5].forEach(y => { const k = cyl(2.2, 3.5, M.metal, 'z'); k.position.set(0, y, 2.9); th.add(k); });
+  onWall(fx, 'S', C.W - 100, 108, th);
+  const hs = new THREE.Group();
+  hs.add(box(-2, 2, -3, 3, 0, 3, M.metal));
+  const head = cyl(1.4, 22, M.metal); head.position.set(0, 9, 4.5); hs.add(head);
+  onWall(fx, 'S', C.W - 30, 112, hs);
+})();
+
+fx.traverse(o => { if (o.isMesh && o.material !== M.glass && o.material !== M.glow){ o.castShadow = true; o.receiveShadow = true; } });
+
+/* ---------- Свет ---------- */
+scene.add(new THREE.HemisphereLight(0xFFFFFF, 0xB9B1A5, .22));
+const sun = new THREE.DirectionalLight(0xFFF5E8, .75);
+sun.position.set(C.W/2 - 160, 720, C.D/2 + 240); sun.target.position.set(C.W/2, 0, C.D/2);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left:-330, right:330, top:330, bottom:-330, near:50, far:1600 });
+sun.shadow.bias = -.0004; sun.shadow.normalBias = .6;
+scene.add(sun, sun.target);
+
+/* ---------- Подписи ---------- */
+const LABELS = [
+  ['Унитаз подвесной, ось 50 см', [C.wc, 47, 62]],
+  ['Биде', [C.bidet, 45, 62]],
+  ['Инсталляция, полустенка 120', [28, 127, 10]],
+  ['Тумба 120, цельная двойная раковина', [220, 64, 50]],
+  ['Шкаф 48, глухая дверца', [353, 232, 46]],
+  ['Зеркало 110 × 80', [220, 196, 3]],
+  ['LED-лента', [C.W/2, C.H - 6, C.D - 3], 'S'],
+  ['Окно 51 × 125', [6, 222, C.D - C.win.u0 - C.win.w/2], 'W'],
+  ['Ниша', [2, 140, C.D - 50], 'W'],
+  ['Душ 130 × 100, трап', [65, 4, 212]],
+  ['Стекло полуматовое', [C.sh.x1, 206, 210]],
+  ['Полотенцесушитель', [C.dry.x0 + C.dry.w/2, 176, C.D - 6]],
+  ['Радиатор KOER 22 × 500 × 500', [10, 68, C.D - C.win.u0 - C.win.w/2]],
+  ['Ванна 180 × 90', [288, 63, 212]],
+  ['Дверь 70, наружу', [C.W + 6, 218, (dz0 + dz1)/2], 'E'],
+  ['378 см', [C.W/2, C.H + 6, -C.tIn/2], null, true],
+  ['257 см', [-C.tOut/2, C.H + 6, C.D/2], null, true]
+];
+const labelBox = document.getElementById('labels');
+const labels = LABELS.map(([text, p, wall, dim]) => {
+  const el = document.createElement('div'); el.className = 'lbl' + (dim ? ' dim' : ''); el.textContent = text; labelBox.appendChild(el);
+  return { el, p: new V3(p[0], p[1], p[2]), wall };
+});
+const tmp = new V3();
+function updateLabels(w, h){
+  if (document.body.classList.contains('hide-labels')) return;
+  labels.forEach(l => {
+    if ((l.wall && !walls[l.wall].g.visible)) { l.el.style.display = 'none'; return; }
+    tmp.copy(l.p).project(camera);
+    if (tmp.z > 1 || tmp.z < -1) { l.el.style.display = 'none'; return; }
+    l.el.style.display = '';
+    l.el.style.transform = 'translate(' + ((tmp.x + 1) / 2 * w).toFixed(1) + 'px,' + ((1 - tmp.y) / 2 * h).toFixed(1) + 'px) translate(-50%,-100%)';
+  });
+}
+
+/* ---------- Камера и управление ---------- */
+const center = new V3(C.W/2, 70, C.D/2);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = .08; controls.minDistance = 10; controls.maxDistance = 2500;
+controls.target.copy(center);
+
+function viewDef(name){
+  const a = Math.max(vw / Math.max(vh, 1), .3), tf = Math.tan(camera.fov * PI / 360);
+  const k = (a < 1.2 ? Math.pow(1.2 / a, .75) : 1) * 1.12;
+  switch (name){
+    case 'over':   return { pos: new V3(C.W/2 + 330*k, 430*k, C.D/2 + 380*k), tgt: center.clone() };
+    case 'back':   return { pos: new V3(C.W/2 - 330*k, 430*k, C.D/2 - 380*k), tgt: center.clone() };
+    case 'plan': {
+      const dist = Math.max((C.D + 70) / (2*tf), (C.W + 90) / (2*tf*a)) + C.H;
+      return { pos: new V3(C.W/2, dist, C.D/2 + .5), tgt: new V3(C.W/2, 0, C.D/2) };
+    }
+    case 'door':   return { pos: new V3(C.W - 12, 162, (dz0 + dz1)/2), tgt: new V3(110, 112, 150) };
+    case 'vanity': return { pos: new V3(305, 164, 58), tgt: new V3(95, 95, 215) };
+  }
+}
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let tween = null;
+function goTo(name, instant){
+  const d = viewDef(name);
+  if (instant || reduceMotion){ camera.position.copy(d.pos); controls.target.copy(d.tgt); tween = null; controls.update(); return; }
+  tween = { t0: performance.now(), dur: 750, p0: camera.position.clone(), q0: controls.target.clone(), p1: d.pos, q1: d.tgt };
+}
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-view]').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  goTo(b.dataset.view);
+}));
+controls.addEventListener('start', () => { tween = null; });
+
+/* ---------- Панель ---------- */
+const palBox = document.getElementById('pal');
+Object.keys(PALETTES).forEach((key, i) => {
+  const p = PALETTES[key], b = document.createElement('button');
+  b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', i === 0 ? 'true' : 'false'); b.dataset.pal = key;
+  b.innerHTML = '<span class="sw"><i style="background:' + p.wall + '"></i><i style="background:' + p.floor + '"></i><i style="background:' + p.wood + '"></i><i style="background:' + METALS[p.metal].color + '"></i></span>';
+  b.appendChild(document.createTextNode(p.name));
+  b.addEventListener('click', () => {
+    palBox.querySelectorAll('button').forEach(x => x.setAttribute('aria-checked', x === b ? 'true' : 'false'));
+    applyPalette(key);
+  });
+  palBox.appendChild(b);
+});
+document.getElementById('tgLabels').addEventListener('change', e => document.body.classList.toggle('hide-labels', !e.target.checked));
+document.getElementById('tgCurtain').addEventListener('change', e => { curtain.visible = e.target.checked; });
+document.getElementById('tgLed').addEventListener('change', e => { ledGrp.visible = ledLights.visible = e.target.checked; });
+let doorTarget = 0, doorAngle = 0;
+document.getElementById('tgDoor').addEventListener('change', e => { doorTarget = e.target.checked ? 75 * PI / 180 : 0; });
+const col = document.getElementById('collapse');
+col.addEventListener('click', () => {
+  const c = document.body.classList.toggle('collapsed');
+  col.setAttribute('aria-expanded', c ? 'false' : 'true'); col.textContent = c ? 'Развернуть' : 'Свернуть';
+  if (typeof resize === 'function' && vw) resize();
+});
+if (window.innerWidth < 640) col.click();
+
+/* ---------- Цикл ---------- */
+function resize(){
+  vw = stage.clientWidth; vh = stage.clientHeight;
+  renderer.setSize(vw, vh, false);
+  const panel = document.getElementById('panel');
+  const pw = (vw > 640 && !document.body.classList.contains('collapsed')) ? panel.offsetWidth + 14 : 0;
+  camera.aspect = (vw + pw) / Math.max(vh, 1);
+  if (pw) camera.setViewOffset(vw + pw, vh, 0, 0, vw, vh); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+applyPalette('stone');
+goTo('over', true);
+
+const ease = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+const rel = new V3();
+function frame(now){
+  if (tween){
+    const k = Math.min(1, (now - tween.t0) / tween.dur), e = ease(k);
+    camera.position.lerpVectors(tween.p0, tween.p1, e); controls.target.lerpVectors(tween.q0, tween.q1, e);
+    if (k >= 1) tween = null;
+  }
+  controls.update();
+  Object.keys(walls).forEach(id => { const w = walls[id]; rel.subVectors(camera.position, w.p); w.g.visible = rel.dot(w.n) > -1; });
+  ceil.visible = camera.position.y < C.H - 1;
+  doorAngle += (doorTarget - doorAngle) * (reduceMotion ? 1 : .12);
+  doorPivot.rotation.y = doorAngle;
+  renderer.render(scene, camera);
+  updateLabels(vw, vh);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__ready = true;
+})();
+</script>
+</body>
+</html>
